@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
-import { coloringPages, palette, svgArt } from "@/lib/coloring-data";
+import { coloringPages, palette } from "@/lib/coloring-data";
 
 export const Route = createFileRoute("/color/$id")({
   head: () => ({
