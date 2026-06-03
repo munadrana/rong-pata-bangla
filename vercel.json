@@ -1,7 +1,12 @@
 {
+  "version": 2,
+  "framework": "vite",
+  "public": true,
   "cleanUrls": true,
-  "trailingSlash": false,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/dist/client/index.html"
+    }
   ]
 }
