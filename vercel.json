@@ -1,13 +1,7 @@
 {
   "buildCommand": "bun run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "functions": {
-    "dist/server/server.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
+  "outputDirectory": "dist/client",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/dist/server/server.js" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
