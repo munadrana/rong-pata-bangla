@@ -1,5 +1,6 @@
 {
+  "outputDirectory": ".vinxi/build",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/" }
   ]
 }
