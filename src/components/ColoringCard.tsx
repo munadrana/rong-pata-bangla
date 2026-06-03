@@ -1,18 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ColoringPage } from "@/lib/coloring-data";
-import { svgArt } from "@/lib/coloring-data";
-
-const categoryColor: Record<string, string> = {
-  "পশুপাখি": "#2ECC71",
-  "ফুল-প্রকৃতি": "#E91E63",
-  "বাড়ি-গ্রাম": "#F39C12",
-  "যানবাহন": "#3498DB",
-  "খেলনা": "#9B59B6",
-  "উৎসব": "#E74C3C",
-};
 
 export function ColoringCard({ page, index = 0 }: { page: ColoringPage; index?: number }) {
-  const color = categoryColor[page.category] ?? "#FF6B1A";
   return (
     <Link
       to="/color/$id"
@@ -21,14 +10,14 @@ export function ColoringCard({ page, index = 0 }: { page: ColoringPage; index?: 
       style={{ animationDelay: `${index * 80}ms` }}
     >
       <div className="card-hover relative bg-card rounded-3xl overflow-hidden border border-border shadow-sm">
-        <div className="relative aspect-square bg-white overflow-hidden">
+        <div className="relative aspect-square bg-white overflow-hidden flex items-center justify-center">
           <div
-            className="w-full h-full"
-            dangerouslySetInnerHTML={{ __html: svgArt[page.svgKey] }}
+            className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain"
+            dangerouslySetInnerHTML={{ __html: page.svgContent }}
           />
           <span
             className="absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow"
-            style={{ backgroundColor: color }}
+            style={{ backgroundColor: page.categoryColor }}
           >
             {page.category}
           </span>

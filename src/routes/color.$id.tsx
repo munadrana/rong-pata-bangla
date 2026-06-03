@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
-import { coloringPages, palette, svgArt } from "@/lib/coloring-data";
+import { coloringPages, palette } from "@/lib/coloring-data";
 
 export const Route = createFileRoute("/color/$id")({
   head: () => ({
@@ -79,7 +79,7 @@ function ColorPage() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
-    const svg = svgArt[page.svgKey];
+    const svg = page.svgContent;
     const blob = new Blob([svg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -96,7 +96,7 @@ function ColorPage() {
   useEffect(() => {
     loadImage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page.svgKey]);
+  }, [page.id]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -229,7 +229,7 @@ function ColorPage() {
               <h3 className="font-display font-bold text-lg mb-3">রেফারেন্স ছবি</h3>
               <div
                 className="aspect-square rounded-xl border border-border bg-white overflow-hidden"
-                dangerouslySetInnerHTML={{ __html: svgArt[page.svgKey] }}
+                dangerouslySetInnerHTML={{ __html: page.svgContent }}
               />
               <p className="mt-2 text-center text-sm font-semibold text-foreground/70">{page.title}</p>
             </div>
