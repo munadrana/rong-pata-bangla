@@ -13,6 +13,9 @@ export default defineConfig({
     server: { entry: "server" },
   },
   nitro: {
-    preset: "vercel"
-  }
+    preset: "vercel",
+    // Do not let Nitro serve root index.html as a static renderer template.
+    // TanStack Start renders the full document via src/routes/__root.tsx.
+    renderer: false,
+  } as any,
 });
