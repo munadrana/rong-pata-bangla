@@ -11,9 +11,11 @@ export function ColoringCard({ page, index = 0 }: { page: ColoringPage; index?: 
     >
       <div className="card-hover relative bg-card rounded-3xl overflow-hidden border border-border shadow-sm">
         <div className="relative aspect-square bg-white overflow-hidden flex items-center justify-center">
-          <div
-            className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain"
-            dangerouslySetInnerHTML={{ __html: page.svgContent }}
+          <img
+            src={page.image}
+            alt={page.title}
+            loading="lazy"
+            className="w-full h-full object-contain p-2"
           />
           <span
             className="absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow"

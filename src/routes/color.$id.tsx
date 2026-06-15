@@ -79,18 +79,22 @@ function ColorPage() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
-    const svg = page.svgContent;
-    const blob = new Blob([svg], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
+      const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+      ctx.drawImage(img, x, y, w, h);
       historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
     };
-    img.src = url;
+    img.src = page.image;
   };
 
   useEffect(() => {
@@ -227,9 +231,10 @@ function ColorPage() {
 
             <div className="bg-card rounded-3xl border border-border p-4 shadow-sm">
               <h3 className="font-display font-bold text-lg mb-3">রেফারেন্স ছবি</h3>
-              <div
-                className="aspect-square rounded-xl border border-border bg-white overflow-hidden"
-                dangerouslySetInnerHTML={{ __html: page.svgContent }}
+              <img
+                src={page.image}
+                alt={page.title}
+                className="aspect-square w-full rounded-xl border border-border bg-white object-contain"
               />
               <p className="mt-2 text-center text-sm font-semibold text-foreground/70">{page.title}</p>
             </div>
