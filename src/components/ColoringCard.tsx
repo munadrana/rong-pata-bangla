@@ -10,12 +10,12 @@ export function ColoringCard({ page, index = 0 }: { page: ColoringPage; index?: 
       style={{ animationDelay: `${index * 80}ms` }}
     >
       <div className="card-hover relative bg-card rounded-3xl overflow-hidden border border-border shadow-sm">
-        <div className="relative aspect-square bg-white overflow-hidden flex items-center justify-center">
+        <div className="relative aspect-square overflow-hidden flex items-center justify-center" style={{ backgroundColor: page.bgColor }}>
           <img
             src={page.image}
             alt={page.title}
             loading="lazy"
-            className="w-full h-full object-contain p-2"
+            className="w-full h-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
           />
           <span
             className="absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow"
