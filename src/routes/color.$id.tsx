@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { coloringPages } from "@/lib/coloring-data";
 
@@ -14,12 +14,6 @@ export const Route = createFileRoute("/color/$id")({
 });
 
 const CANVAS_SIZE = 600;
-
-const PENCIL_CURSOR =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M 24 2 L 30 8 L 10 28 L 2 30 L 4 22 Z' fill='%23FF6B1A' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M 22 4 L 28 10' stroke='black' stroke-width='1'/%3E%3Cpath d='M 4 22 L 10 28' stroke='black' stroke-width='1'/%3E%3C/svg%3E\") 2 30, crosshair";
-
-const ERASER_CURSOR =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Crect x='2' y='8' width='20' height='12' rx='2' fill='white' stroke='%23FF6B1A' stroke-width='2'/%3E%3Cline x1='2' y1='14' x2='22' y2='14' stroke='%23FF6B1A' stroke-width='1'/%3E%3C/svg%3E\") 12 20, cell";
 
 const colors = [
   "#FF0000", "#FF4500", "#FF6B1A", "#FF8C00", "#FFD700",
@@ -38,6 +32,23 @@ function hexToRgb(hex: string): [number, number, number] {
     parseInt(h.slice(2, 4), 16),
     parseInt(h.slice(4, 6), 16),
   ];
+}
+
+function buildPencilCursor(color: string) {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>
+    <path d='M 24 2 L 30 8 L 10 28 L 2 30 L 4 22 Z' fill='${color}' stroke='black' stroke-width='1.5'/>
+    <path d='M 4 22 L 10 28' stroke='black' stroke-width='1'/>
+    <path d='M 22 4 L 28 10' stroke='black' stroke-width='1'/>
+  </svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 2 30, crosshair`;
+}
+
+function buildEraserCursor() {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>
+    <rect x='2' y='8' width='20' height='12' rx='2' fill='white' stroke='#FF6B1A' stroke-width='2'/>
+    <line x1='2' y1='14' x2='22' y2='14' stroke='#FF6B1A' stroke-width='1'/>
+  </svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 12 20, cell`;
 }
 
 function floodFill(
@@ -108,6 +119,16 @@ function floodFill(
   ctx.putImageData(imageData, 0, 0);
 }
 
+function showConfetti() {
+  const palette = ["#FF6B1A", "#FFD700", "#FF69B4", "#00CED1", "#7B68EE", "#2ECC71"];
+  for (let i = 0; i < 60; i++) {
+    const div = document.createElement("div");
+    div.style.cssText = `position:fixed;width:10px;height:10px;background:${palette[i % palette.length]};left:${Math.random() * 100}vw;top:-20px;border-radius:${Math.random() > 0.5 ? "50%" : "2px"};animation:confetti-fall ${1 + Math.random() * 2}s linear forwards;z-index:9999;pointer-events:none;`;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 3200);
+  }
+}
+
 function ColorPage() {
   const { id } = useParams({ from: "/color/$id" });
   const page = coloringPages.find((p) => p.id === id) ?? coloringPages[0];
@@ -116,10 +137,25 @@ function ColorPage() {
   const [selectedColor, setSelectedColor] = useState<string>("#FF6B1A");
   const [isEraser, setIsEraser] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const historyRef = useRef<ImageData[]>([]);
   const [historyCount, setHistoryCount] = useState(0);
   const MAX_HISTORY = 10;
+
+  const [zoom, setZoom] = useState(1);
+  const [coloredPercent, setColoredPercent] = useState(0);
+  const milestonesRef = useRef({ p25: false, p50: false, p90: false });
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  const updateCursor = useCallback((color: string, eraser: boolean) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.style.cursor = eraser ? buildEraserCursor() : buildPencilCursor(color);
+  }, []);
 
   const loadImage = () => {
     const canvas = canvasRef.current;
@@ -141,14 +177,21 @@ function ColorPage() {
       ctx.drawImage(img, x, y, w, h);
       historyRef.current = [];
       setHistoryCount(0);
+      setColoredPercent(0);
+      milestonesRef.current = { p25: false, p50: false, p90: false };
     };
     img.src = page.image;
   };
 
   useEffect(() => {
     loadImage();
+    updateCursor(selectedColor, isEraser);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page.id]);
+
+  useEffect(() => {
+    updateCursor(selectedColor, isEraser);
+  }, [selectedColor, isEraser, updateCursor]);
 
   const saveHistory = () => {
     const canvas = canvasRef.current;
@@ -161,6 +204,31 @@ function ColorPage() {
     setHistoryCount(historyRef.current.length);
   };
 
+  const checkProgress = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let colored = 0;
+    let fillable = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const isOutline = r < 80 && g < 80 && b < 80;
+      if (isOutline) continue;
+      fillable++;
+      const isWhite = r > 240 && g > 240 && b > 240;
+      if (!isWhite) colored++;
+    }
+    if (fillable === 0) return;
+    const percent = Math.round((colored / fillable) * 100);
+    setColoredPercent(percent);
+    const m = milestonesRef.current;
+    if (percent >= 25 && !m.p25) { m.p25 = true; showToast("দারুণ! ২৫% রঙ হয়েছে! 🎨"); }
+    if (percent >= 50 && !m.p50) { m.p50 = true; showToast("অর্ধেক হয়ে গেছে! 🌟"); }
+    if (percent >= 90 && !m.p90) { m.p90 = true; showToast("অসাধারণ! ছবি প্রায় সম্পূর্ণ! 🏆"); showConfetti(); }
+  };
+
   const doFill = (x: number, y: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -169,6 +237,7 @@ function ColorPage() {
     requestAnimationFrame(() => {
       floodFill(canvas, x, y, isEraser ? "#FFFFFF" : selectedColor);
       setIsFilling(false);
+      checkProgress();
     });
   };
 
@@ -181,24 +250,51 @@ function ColorPage() {
     doFill(x, y);
   };
 
-  // Touch support (non-passive to preventDefault)
+  // Touch + pinch zoom
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const onTouch = (e: TouchEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const touch = e.touches[0] ?? e.changedTouches[0];
-      if (!touch) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((touch.clientX - rect.left) * (canvas.width / rect.width));
-      const y = Math.floor((touch.clientY - rect.top) * (canvas.height / rect.height));
-      doFill(x, y);
+    let initialDistance = 0;
+    let initialZoom = 1;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        initialDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        initialZoom = zoom;
+        return;
+      }
+      if (e.touches.length === 1) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor((touch.clientX - rect.left) * (canvas.width / rect.width));
+        const y = Math.floor((touch.clientY - rect.top) * (canvas.height / rect.height));
+        doFill(x, y);
+      }
     };
-    canvas.addEventListener("touchstart", onTouch, { passive: false });
-    return () => canvas.removeEventListener("touchstart", onTouch);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialDistance > 0) {
+        e.preventDefault();
+        const distance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        const scale = distance / initialDistance;
+        setZoom(Math.min(Math.max(initialZoom * scale, 0.5), 3));
+      }
+    };
+
+    canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedColor, isEraser]);
+  }, [selectedColor, isEraser, zoom]);
 
   const handleUndo = () => {
     if (historyRef.current.length === 0) return;
@@ -209,6 +305,7 @@ function ColorPage() {
     const imageData = historyRef.current.pop()!;
     ctx.putImageData(imageData, 0, 0);
     setHistoryCount(historyRef.current.length);
+    checkProgress();
   };
 
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -225,8 +322,7 @@ function ColorPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+    showToast("🎉 ছবি ডাউনলোড হয়েছে!");
   };
 
   const share = async () => {
@@ -236,17 +332,20 @@ function ColorPage() {
         await navigator.share({ title: page.title, url });
       } else {
         await navigator.clipboard.writeText(url);
-        alert("লিংক কপি হয়েছে! 🎉");
+        showToast("লিংক কপি হয়েছে! 🎉");
       }
     } catch {}
   };
 
   const reset = () => loadImage();
 
-  const cursorStyle = isEraser ? ERASER_CURSOR : PENCIL_CURSOR;
+  const zoomIn = () => setZoom((p) => Math.min(p + 0.25, 3));
+  const zoomOut = () => setZoom((p) => Math.max(p - 0.25, 0.5));
+  const zoomReset = () => setZoom(1);
 
   return (
     <div className="min-h-screen pb-20 md:pb-6">
+      <style>{`@keyframes confetti-fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }`}</style>
       <Navbar />
 
       <div className="mx-auto max-w-7xl px-4 py-6">
@@ -263,16 +362,21 @@ function ColorPage() {
                 {page.category}
               </span>
             </div>
-            <div className="relative rounded-2xl border-4 border-dashed border-primary/40 p-3 bg-white">
-              <canvas
-                ref={canvasRef}
-                width={CANVAS_SIZE}
-                height={CANVAS_SIZE}
-                onClick={handleCanvasClick}
-                onContextMenu={handleContextMenu}
-                className="w-full h-auto aspect-square rounded-xl touch-none select-none"
-                style={{ imageRendering: "auto", cursor: cursorStyle }}
-              />
+            <div className="relative rounded-2xl border-4 border-dashed border-primary/40 p-3 bg-white overflow-hidden">
+              <div
+                className="origin-center transition-transform duration-150 ease-out"
+                style={{ transform: `scale(${zoom})` }}
+              >
+                <canvas
+                  ref={canvasRef}
+                  width={CANVAS_SIZE}
+                  height={CANVAS_SIZE}
+                  onClick={handleCanvasClick}
+                  onContextMenu={handleContextMenu}
+                  className="w-full h-auto aspect-square rounded-xl touch-none select-none"
+                  style={{ imageRendering: "auto" }}
+                />
+              </div>
               {isFilling && (
                 <div className="absolute inset-0 grid place-items-center bg-white/40 rounded-2xl pointer-events-none">
                   <div className="bg-white/95 rounded-full px-5 py-2 shadow-playful font-display font-bold text-primary flex items-center gap-2">
@@ -282,13 +386,57 @@ function ColorPage() {
                 </div>
               )}
             </div>
-            <p className="mt-4 text-center font-display font-extrabold text-2xl tracking-widest text-primary">
+
+            {/* Zoom controls */}
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button onClick={zoomOut} className="rounded-full bg-white border border-border w-10 h-10 font-bold btn-bounce hover:bg-muted" aria-label="Zoom out">🔍−</button>
+              <span className="min-w-[64px] text-center font-display font-bold text-foreground/80">{Math.round(zoom * 100)}%</span>
+              <button onClick={zoomIn} className="rounded-full bg-white border border-border w-10 h-10 font-bold btn-bounce hover:bg-muted" aria-label="Zoom in">🔍+</button>
+              <button onClick={zoomReset} className="rounded-full bg-white border border-border px-3 h-10 font-semibold btn-bounce hover:bg-muted">⟲ রিসেট</button>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="w-full h-3 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${coloredPercent}%`,
+                    background: "linear-gradient(90deg,#FF6B1A,#FFD700,#2ECC71)",
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-center text-sm font-semibold text-foreground/70">
+                {coloredPercent}% রঙ হয়েছে
+              </p>
+            </div>
+
+            <p className="mt-3 text-center font-display font-extrabold text-2xl tracking-widest text-primary">
               COLOR ME!
             </p>
           </div>
 
           {/* Tools */}
           <aside className="space-y-4">
+            {/* Selected color indicator */}
+            <div className="bg-card rounded-3xl border border-border p-4 shadow-sm flex items-center gap-4">
+              <div
+                className="w-14 h-14 rounded-full border-4 border-white shadow-playful ring-2 ring-border"
+                style={{ background: isEraser ? "#ffffff" : selectedColor }}
+              />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-foreground/60">বেছে নেওয়া রঙ</p>
+                <p className="font-display font-extrabold text-lg">
+                  {isEraser ? "🧹 ইরেজার" : "🖊️ রঙ তুলি"}
+                </p>
+                <p className="text-xs font-mono text-foreground/60">{isEraser ? "মুছে ফেলো" : selectedColor.toUpperCase()}</p>
+              </div>
+              <svg width="42" height="42" viewBox="0 0 32 32" aria-hidden>
+                <path d="M 24 2 L 30 8 L 10 28 L 2 30 L 4 22 Z" fill={isEraser ? "#ffffff" : selectedColor} stroke="black" strokeWidth="1.5" />
+                <path d="M 4 22 L 10 28" stroke="black" strokeWidth="1" />
+              </svg>
+            </div>
+
             <div className="bg-card rounded-3xl border border-border p-4 shadow-sm">
               <h3 className="font-display font-bold text-lg mb-3">🎨 রঙ বাছো</h3>
               <div className="grid grid-cols-5 gap-2">
@@ -357,7 +505,7 @@ function ColorPage() {
               <ul className="text-sm space-y-1 text-foreground/80">
                 <li>• প্রথমে একটি রঙ বেছে নাও</li>
                 <li>• তারপর ছবির যেকোনো অংশে ক্লিক করো</li>
-                <li>• ভিন্ন রঙ দিয়ে আবার ক্লিক করলে রঙ বদলাবে</li>
+                <li>• ছোট অংশে জুম করে রঙ করতে পারো</li>
                 <li>• ডান-ক্লিক বা আনডু বাটনে শেষ রঙ ফিরে যাবে</li>
                 <li>• শেষ হলে ডাউনলোড বাটনে ক্লিক করো</li>
               </ul>
@@ -375,9 +523,9 @@ function ColorPage() {
         </div>
       </div>
 
-      {showSuccess && (
+      {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-primary text-primary-foreground px-6 py-3 rounded-full shadow-playful font-bold animate-in fade-in slide-in-from-bottom-4">
-          🎉 ছবি ডাউনলোড হয়েছে!
+          {toast}
         </div>
       )}
     </div>
