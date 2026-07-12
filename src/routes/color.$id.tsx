@@ -1,5 +1,6 @@
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
 import { coloringPages } from "@/lib/coloring-data";
 
@@ -131,13 +132,17 @@ function showConfetti() {
 
 function ColorPage() {
   const { id } = useParams({ from: "/color/$id" });
-  const page = coloringPages.find((p) => p.id === id) ?? coloringPages[0];
+  const navigate = useNavigate();
+  const currentIndex = coloringPages.findIndex((p) => p.id === id);
+  const currentPage = currentIndex >= 0 ? coloringPages[currentIndex] : coloringPages[0];
+  const prevPage = currentIndex > 0 ? coloringPages[currentIndex - 1] : null;
+  const nextPage = currentIndex < coloringPages.length - 1 ? coloringPages[currentIndex + 1] : null;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>("#FF6B1A");
   const [isEraser, setIsEraser] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const historyRef = useRef<ImageData[]>([]);
   const [historyCount, setHistoryCount] = useState(0);
   const MAX_HISTORY = 10;
@@ -146,48 +151,60 @@ function ColorPage() {
   const [coloredPercent, setColoredPercent] = useState(0);
   const milestonesRef = useRef({ p25: false, p50: false, p90: false });
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  }, []);
-
   const updateCursor = useCallback((color: string, eraser: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.style.cursor = eraser ? buildEraserCursor() : buildPencilCursor(color);
   }, []);
 
-  const loadImage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      ctx.fillStyle = "#ffffff";
+  const drawImageOnCanvas = useCallback(
+    (resetProgress: boolean) => {
+      const canvas = canvasRef.current;
+      if (!canvas || !currentPage?.image) return;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+
+      setIsLoading(true);
+      ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const x = (canvas.width - w) / 2;
-      const y = (canvas.height - h) / 2;
-      ctx.drawImage(img, x, y, w, h);
-      historyRef.current = [];
-      setHistoryCount(0);
-      setColoredPercent(0);
-      milestonesRef.current = { p25: false, p50: false, p90: false };
-    };
-    img.src = page.image;
-  };
+
+      const drawImg = (img: HTMLImageElement) => {
+        const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, x, y, w, h);
+        setIsLoading(false);
+        historyRef.current = [];
+        setHistoryCount(0);
+        if (resetProgress) {
+          setColoredPercent(0);
+          milestonesRef.current = { p25: false, p50: false, p90: false };
+        }
+      };
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => drawImg(img);
+      img.onerror = () => {
+        const img2 = new Image();
+        img2.onload = () => drawImg(img2);
+        img2.onerror = () => setIsLoading(false);
+        img2.src = currentPage.image;
+      };
+      img.src = currentPage.image;
+    },
+    [currentPage],
+  );
 
   useEffect(() => {
-    loadImage();
+    drawImageOnCanvas(true);
     updateCursor(selectedColor, isEraser);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page.id]);
+  }, [currentPage.id]);
 
   useEffect(() => {
     updateCursor(selectedColor, isEraser);
@@ -224,20 +241,21 @@ function ColorPage() {
     const percent = Math.round((colored / fillable) * 100);
     setColoredPercent(percent);
     const m = milestonesRef.current;
-    if (percent >= 25 && !m.p25) { m.p25 = true; showToast("দারুণ! ২৫% রঙ হয়েছে! 🎨"); }
-    if (percent >= 50 && !m.p50) { m.p50 = true; showToast("অর্ধেক হয়ে গেছে! 🌟"); }
-    if (percent >= 90 && !m.p90) { m.p90 = true; showToast("অসাধারণ! ছবি প্রায় সম্পূর্ণ! 🏆"); showConfetti(); }
+    if (percent >= 25 && !m.p25) { m.p25 = true; toast.success("দারুণ! ২৫% রঙ হয়েছে! 🎨"); }
+    if (percent >= 50 && !m.p50) { m.p50 = true; toast.success("অর্ধেক হয়ে গেছে! 🌟"); }
+    if (percent >= 90 && !m.p90) { m.p90 = true; toast.success("অসাধারণ! ছবি প্রায় সম্পূর্ণ! 🏆"); showConfetti(); }
   };
 
   const doFill = (x: number, y: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return;
     saveHistory();
     setIsFilling(true);
     requestAnimationFrame(() => {
       floodFill(canvas, x, y, isEraser ? "#FFFFFF" : selectedColor);
       setIsFilling(false);
-      checkProgress();
+      setTimeout(() => checkProgress(), 100);
     });
   };
 
@@ -245,8 +263,10 @@ function ColorPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor(((e.clientX - rect.left) / rect.width) * canvas.width);
-    const y = Math.floor(((e.clientY - rect.top) / rect.height) * canvas.height);
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
     doFill(x, y);
   };
 
@@ -317,34 +337,37 @@ function ColorPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = `${page.title}-রঙিন.png`;
+    link.download = `${currentPage.title}-রঙিন.png`;
     link.href = canvas.toDataURL("image/png", 1.0);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("🎉 ছবি ডাউনলোড হয়েছে!");
+    toast.success("🎉 ছবি ডাউনলোড হয়েছে!");
   };
 
   const share = async () => {
     const url = window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: page.title, url });
+        await navigator.share({ title: currentPage.title, url });
       } else {
         await navigator.clipboard.writeText(url);
-        showToast("লিংক কপি হয়েছে! 🎉");
+        toast.success("লিংক কপি হয়েছে! 🎉");
       }
     } catch {}
   };
 
-  const reset = () => loadImage();
+  const handleReset = () => {
+    drawImageOnCanvas(true);
+    toast.success("ছবি রিসেট হয়েছে! 🔄");
+  };
 
   const zoomIn = () => setZoom((p) => Math.min(p + 0.25, 3));
   const zoomOut = () => setZoom((p) => Math.max(p - 0.25, 0.5));
   const zoomReset = () => setZoom(1);
 
   return (
-    <div className="min-h-screen pb-20 md:pb-6">
+    <div className="min-h-screen pb-24 md:pb-6">
       <style>{`@keyframes confetti-fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }`}</style>
       <Navbar />
 
@@ -353,13 +376,34 @@ function ColorPage() {
           ← হোমে ফেরো
         </Link>
 
+        {/* Prev/Next navigation */}
+        <div className="flex items-center justify-between gap-2 mb-4 bg-card border border-border rounded-2xl px-3 py-2 shadow-sm">
+          <button
+            onClick={() => prevPage && navigate({ to: "/color/$id", params: { id: String(prevPage.id) } })}
+            disabled={!prevPage}
+            className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm font-semibold btn-bounce hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ← আগের ছবি
+          </button>
+          <span className="font-display font-bold text-sm text-foreground/70">
+            পেজ {currentIndex + 1} / {coloringPages.length}
+          </span>
+          <button
+            onClick={() => nextPage && navigate({ to: "/color/$id", params: { id: String(nextPage.id) } })}
+            disabled={!nextPage}
+            className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm font-semibold btn-bounce hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            পরের ছবি →
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
           {/* Canvas */}
           <div className="bg-card rounded-3xl border border-border shadow-playful p-4 md:p-6">
             <div className="flex items-center justify-between mb-3">
-              <h1 className="font-display font-extrabold text-2xl md:text-3xl">{page.title}</h1>
+              <h1 className="font-display font-extrabold text-2xl md:text-3xl">{currentPage.title}</h1>
               <span className="hidden md:inline-flex rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-bold">
-                {page.category}
+                {currentPage.category}
               </span>
             </div>
             <div className="relative rounded-2xl border-4 border-dashed border-primary/40 p-3 bg-white overflow-hidden">
@@ -377,7 +421,15 @@ function ColorPage() {
                   style={{ imageRendering: "auto" }}
                 />
               </div>
-              {isFilling && (
+              {isLoading && (
+                <div className="absolute inset-0 grid place-items-center bg-white/70 rounded-2xl z-10">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="font-display font-bold text-primary">ছবি লোড হচ্ছে...</p>
+                  </div>
+                </div>
+              )}
+              {isFilling && !isLoading && (
                 <div className="absolute inset-0 grid place-items-center bg-white/40 rounded-2xl pointer-events-none">
                   <div className="bg-white/95 rounded-full px-5 py-2 shadow-playful font-display font-bold text-primary flex items-center gap-2">
                     <span className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -439,7 +491,7 @@ function ColorPage() {
 
             <div className="bg-card rounded-3xl border border-border p-4 shadow-sm">
               <h3 className="font-display font-bold text-lg mb-3">🎨 রঙ বাছো</h3>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-2 max-h-[240px] md:max-h-none overflow-y-auto md:overflow-visible pr-1">
                 {colors.map((c) => {
                   const active = !isEraser && c.toLowerCase() === selectedColor.toLowerCase();
                   return (
@@ -484,20 +536,26 @@ function ColorPage() {
                 >
                   ↩️ আনডু
                 </button>
-                <button onClick={reset} className="rounded-xl bg-white border border-border px-3 py-2 font-semibold btn-bounce hover:bg-muted">
-                  ♻️ নতুন করো
+                <button onClick={handleReset} className="rounded-xl bg-white border border-border px-3 py-2 font-semibold btn-bounce hover:bg-muted">
+                  🔄 নতুন করো
                 </button>
               </div>
             </div>
 
             <div className="bg-card rounded-3xl border border-border p-4 shadow-sm">
               <h3 className="font-display font-bold text-lg mb-3">রেফারেন্স ছবি</h3>
-              <img
-                src={page.image}
-                alt={page.title}
-                className="aspect-square w-full rounded-xl border border-border bg-white object-contain"
-              />
-              <p className="mt-2 text-center text-sm font-semibold text-foreground/70">{page.title}</p>
+              <div className="aspect-square w-full rounded-xl border border-border bg-white overflow-hidden">
+                <img
+                  src={currentPage.image}
+                  alt={currentPage.title}
+                  crossOrigin="anonymous"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-center text-sm font-semibold text-foreground/70">{currentPage.title}</p>
             </div>
 
             <div className="rounded-3xl p-4 border border-yellow/40" style={{ background: "#FFF3C4" }}>
@@ -511,7 +569,7 @@ function ColorPage() {
               </ul>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="hidden md:grid grid-cols-2 gap-2">
               <button onClick={handleDownload} className="rounded-full bg-primary text-primary-foreground px-4 py-3 font-bold shadow-playful btn-bounce">
                 ⬇️ ডাউনলোড
               </button>
@@ -523,11 +581,22 @@ function ColorPage() {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-primary text-primary-foreground px-6 py-3 rounded-full shadow-playful font-bold animate-in fade-in slide-in-from-bottom-4">
-          {toast}
-        </div>
-      )}
+      {/* Sticky mobile action bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border px-3 py-2 grid grid-cols-3 gap-2 shadow-lg">
+        <button
+          onClick={handleUndo}
+          disabled={historyCount === 0}
+          className="rounded-xl bg-white border border-border px-2 py-2 font-semibold text-sm btn-bounce disabled:opacity-40"
+        >
+          ↩️ আনডু
+        </button>
+        <button onClick={handleReset} className="rounded-xl bg-white border border-border px-2 py-2 font-semibold text-sm btn-bounce">
+          🔄 রিসেট
+        </button>
+        <button onClick={handleDownload} className="rounded-xl bg-primary text-primary-foreground px-2 py-2 font-bold text-sm btn-bounce shadow-playful">
+          ⬇️ ডাউনলোড
+        </button>
+      </div>
     </div>
   );
 }
