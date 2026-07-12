@@ -364,7 +364,6 @@ function ColorPage() {
 
   const zoomIn = () => setZoom((p) => Math.min(p + 0.25, 3));
   const zoomOut = () => setZoom((p) => Math.max(p - 0.25, 0.5));
-  const zoomReset = () => setZoom(1);
 
   return (
     <div className="min-h-screen pb-24 md:pb-6">
