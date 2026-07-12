@@ -364,7 +364,6 @@ function ColorPage() {
 
   const zoomIn = () => setZoom((p) => Math.min(p + 0.25, 3));
   const zoomOut = () => setZoom((p) => Math.max(p - 0.25, 0.5));
-  const zoomReset = () => setZoom(1);
 
   return (
     <div className="min-h-screen pb-24 md:pb-6">
@@ -444,7 +443,6 @@ function ColorPage() {
               <button onClick={zoomOut} className="rounded-full bg-white border border-border w-10 h-10 font-bold btn-bounce hover:bg-muted" aria-label="Zoom out">🔍−</button>
               <span className="min-w-[64px] text-center font-display font-bold text-foreground/80">{Math.round(zoom * 100)}%</span>
               <button onClick={zoomIn} className="rounded-full bg-white border border-border w-10 h-10 font-bold btn-bounce hover:bg-muted" aria-label="Zoom in">🔍+</button>
-              <button onClick={zoomReset} className="rounded-full bg-white border border-border px-3 h-10 font-semibold btn-bounce hover:bg-muted">⟲ রিসেট</button>
             </div>
 
             {/* Progress bar */}
