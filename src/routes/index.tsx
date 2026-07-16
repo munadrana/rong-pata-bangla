@@ -130,8 +130,13 @@ function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-border mt-10 py-8 text-center text-sm text-muted-foreground">
-        ❤️ দিয়ে তৈরি — রঙ.পাতা.বাংলা
+      <footer className="border-t border-border mt-10 py-8 flex flex-col items-center gap-2 text-sm text-muted-foreground">
+        <img
+          src="/logo.png"
+          alt="রং.পাতা.বাংলা"
+          style={{ height: "44px", width: "auto", objectFit: "contain" }}
+        />
+        <span>❤️ দিয়ে তৈরি</span>
       </footer>
     </div>
   );
