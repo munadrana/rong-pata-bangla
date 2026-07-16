@@ -13,12 +13,12 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 w-full bg-background/85 backdrop-blur border-b border-border">
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
-        <Link to="/" className="font-display font-extrabold text-2xl tracking-tight">
-          <span style={{ color: "#FF6B1A" }}>রঙ</span>
-          <span className="text-foreground">.</span>
-          <span style={{ color: "#2ECC71" }}>পাতা</span>
-          <span className="text-foreground">.</span>
-          <span style={{ color: "#FF6B1A" }}>বাংলা</span>
+        <Link to="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+          <img
+            src="/logo.png"
+            alt="রং.পাতা.বাংলা"
+            style={{ height: "50px", width: "auto", objectFit: "contain" }}
+          />
         </Link>
         <nav className="hidden md:flex items-center gap-1">
           {links.map((l, i) => (
